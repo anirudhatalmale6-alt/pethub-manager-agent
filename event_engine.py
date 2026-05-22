@@ -399,6 +399,21 @@ class EventEngine:
             logger.error(f"Cross-agent analysis failed: {e}")
             results["cross_agent"] = f"error: {e}"
 
+        # AI-powered event analysis for smarter prioritization
+        try:
+            from ai_client import ai_prioritize_actions
+            recent_events = self.events[-10:] if self.events else []
+            if recent_events:
+                prioritized = await ai_prioritize_actions(recent_events)
+                if prioritized:
+                    self.state["ai_insights"] = {
+                        "last_analysis": self._now(),
+                        "priorities": prioritized[:5],
+                    }
+                    logger.info("AI event prioritization completed")
+        except Exception as e:
+            logger.debug(f"AI prioritization unavailable: {e}")
+
         self.save_to_state()
 
         cycle_end = self._now()

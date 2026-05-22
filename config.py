@@ -10,8 +10,11 @@ class Settings(BaseSettings):
 
     # Facebook
     FB_PAGE_ID: str = "1116722411522462"
-    FB_PAGE_TOKEN: str = "EAANnapiZBRwUBRnGvBW38grDQwLOf95fc6mEWdI99ZCIUXNEMH9hdnNd592UyO1wDtK0MrhXDwo14q8bewy3m7M6V0lnFc6EqXlpUEVvRcmDDM9lZCatQPeZBZAsxp1ZABg0noSyphUbBONAnOQPdZAU7PL8ZCenZCB0hvsa5lf5vmTZC1QQT9XvaeE9faZBRr9VGTCsyZB4dYkGZCXNinnzQtpIn21J8ZBwkDrH6uuqPjVovjVwwZD"
+    FB_PAGE_TOKEN: str = "EAANnapiZBRwUBRvOob7rYqJKmWPWR4t5zlZCn24FrCMIh4n1j1GMYl8aUDQDQuMoOuRNllFZCVlInFvJa9CzPww6SuzZB4YVEqFMhO1PTrMFEJaYhAhcmgHoNM7CfACK7b1hjk7sfsxzuTyPjFlzKlFBeMP6TZCsrKO2NjHPkUm9ZBKFiqJZCkx2HBAbWnvT08BZBUqo"
     FB_GRAPH_URL: str = "https://graph.facebook.com/v21.0"
+
+    # OpenAI
+    OPENAI_API_KEY: str = ""
 
     # Agent endpoints
     SEO_AGENT_URL: str = "http://127.0.0.1:8101"
