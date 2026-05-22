@@ -364,9 +364,12 @@ body::after{
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+
+  <div id="learningdata" class="tab-panel" style="display:none"><div class="section"><h2>Loading Learning Data...</h2></div></div>
+  <div id="roipredict" class="tab-panel" style="display:none"><div class="section"><h2>Loading ROI Predictor...</h2></div></div>
 <script>
 const $ = s => document.querySelector(s);
-const API = '';
+const API = '/agents/manager';
 
 function showToast(msg, type='success') {
   const t = $('#toast');
@@ -549,6 +552,81 @@ async function refreshAll() {
 
 refreshAll();
 setInterval(refreshAll, 30000);
+
+
+// ── Learning Data Tab ──
+async function loadLearningData() {
+  const r = await fetch('/agents/manager/api/learning');
+  const d = await r.json();
+  let el = document.getElementById('learningdata');
+  if (!el) return;
+  let html = '<div style="padding:20px"><h2 style="color:var(--text,#e2e8f0);margin-bottom:16px">Cross-Agent Learning</h2>';
+  html += '<div style="background:#111621;border:1px solid #1a2236;border-radius:12px;padding:16px;margin-bottom:16px"><span style="color:#7a8ba8">Total Outcomes Tracked: </span><span style="color:#22c55e;font-weight:700">'+(d.total_outcomes||0)+'</span></div>';
+  const scores = d.agent_scores || {};
+  if (Object.keys(scores).length) {
+    html += '<table style="width:100%;border-collapse:collapse;background:#111621;border:1px solid #1a2236;border-radius:12px;overflow:hidden"><thead><tr>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Agent</th>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Grade</th>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Success Rate</th>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Total Actions</th>';
+    html += '</tr></thead><tbody>';
+    Object.entries(scores).forEach(([agent, data]) => {
+      const gradeColor = {'A':'#22c55e','B':'#3b82f6','C':'#f59e0b','D':'#ef4444','F':'#ef4444'}[data.grade||'C']||'#94a3b8';
+      html += '<tr><td style="padding:12px;color:#e2e8f0;text-transform:capitalize">'+agent+'</td>';
+      html += '<td style="padding:12px;color:'+gradeColor+';font-weight:700;font-size:18px">'+(data.grade||'-')+'</td>';
+      html += '<td style="padding:12px;color:#e2e8f0">'+(data.success_rate||0).toFixed(0)+'%</td>';
+      html += '<td style="padding:12px;color:#e2e8f0">'+(data.total||0)+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  if (d.priorities && d.priorities.length) {
+    html += '<h3 style="color:#8b5cf6;margin:16px 0 8px">Recommended Priorities</h3><ul style="list-style:none;padding:0">';
+    d.priorities.forEach(p => {
+      html += '<li style="background:#111621;border:1px solid #1a2236;border-radius:8px;padding:12px;margin-bottom:8px;color:#e2e8f0">'+(p.action||p)+'</li>';
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── ROI Predictor Tab ──
+async function loadROIPredict() {
+  const r = await fetch('/agents/manager/api/roi');
+  const d = await r.json();
+  let el = document.getElementById('roipredict');
+  if (!el) return;
+  let html = '<div style="padding:20px"><h2 style="color:var(--text,#e2e8f0);margin-bottom:16px">ROI Predictor</h2>';
+  html += '<div style="background:#111621;border:1px solid #1a2236;border-radius:12px;padding:16px;margin-bottom:16px"><span style="color:#7a8ba8">Action History: </span><span style="color:#22c55e;font-weight:700">'+(d.history_count||0)+' recorded</span></div>';
+  const model = d.roi_model || {};
+  if (Object.keys(model).length) {
+    html += '<h3 style="color:#f59e0b;margin:16px 0 8px">ROI Model Weights</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;background:#111621;border:1px solid #1a2236;border-radius:12px;overflow:hidden"><thead><tr>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Action Type</th>';
+    html += '<th style="text-align:left;padding:12px;color:#7a8ba8;border-bottom:1px solid #1a2236">Weight</th>';
+    html += '</tr></thead><tbody>';
+    Object.entries(model).forEach(([action, weight]) => {
+      html += '<tr><td style="padding:12px;color:#e2e8f0;text-transform:capitalize">'+action.replace(/_/g,' ')+'</td>';
+      html += '<td style="padding:12px;color:#22c55e">'+((weight||0)*100).toFixed(0)+'%</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '<br><h3 style="color:#f59e0b;margin:16px 0 8px">Test ROI Prediction</h3>';
+  html += '<div style="display:flex;gap:8px;align-items:center">';
+  html += '<select id="roi-action" style="padding:8px;border-radius:8px;background:#1a2236;color:#e2e8f0;border:1px solid #243050"><option value="social_post">Social Post</option><option value="seo_audit">SEO Audit</option><option value="link_scan">Link Scan</option><option value="performance_scan">Performance Scan</option></select>';
+  html += '<button style="padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:#8b5cf6;color:#fff;font-weight:600" onclick="predictROI()">Predict</button>';
+  html += '<span id="roi-result" style="color:#22c55e;font-weight:700"></span>';
+  html += '</div>';
+  html += '</div>';
+  el.innerHTML = html;
+}
+async function predictROI() {
+  const action = document.getElementById('roi-action').value;
+  const r = await fetch('/agents/manager/api/roi/predict?action_type='+action+'&urgency=0.5', {method:'POST'});
+  const d = await r.json();
+  document.getElementById('roi-result').textContent = 'Predicted ROI: '+(d.predicted_roi||d.roi||0).toFixed(2);
+}
+
 </script>
 </body>
 </html>

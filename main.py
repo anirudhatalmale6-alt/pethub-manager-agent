@@ -159,6 +159,62 @@ async def run_health_check():
 
 # ─── App lifecycle ──────────────────────────────────────────────────────────
 
+
+# ── Scheduled upgrade functions ─────────────────────────────────────
+
+async def run_learning_update():
+    """Update cross-agent learning from recent dispatches."""
+    try:
+        from cross_agent_learning import load_learning_data, record_dispatch_outcome, get_agent_effectiveness_scores, save_learning_data
+        data = load_learning_data()
+        # Record outcomes from recent dispatches
+        for d in state.get("dispatches", [])[-50:]:
+            record_dispatch_outcome(
+                data,
+                agent=d.get("agent", "unknown"),
+                action=d.get("action", "unknown"),
+                success=d.get("success", False),
+                context={"trigger": d.get("trigger", "")},
+            )
+        scores = get_agent_effectiveness_scores(data)
+        state["learning_data"] = {
+            "scores": scores,
+            "total_outcomes": len(data.get("dispatch_outcomes", [])),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        save_learning_data(data)
+        save_state()
+        logger.info(f"Learning update complete: {len(data.get('dispatch_outcomes', []))} outcomes tracked")
+    except Exception as e:
+        logger.error(f"Learning update failed: {e}")
+
+
+async def run_roi_update():
+    """Update ROI predictions based on dispatch history."""
+    try:
+        from roi_predictor import load_roi_data, record_action_outcome, save_roi_data
+        data = load_roi_data()
+        # Record recent dispatch outcomes
+        for d in state.get("dispatches", [])[-20:]:
+            record_action_outcome(
+                data,
+                action_type=d.get("action", "unknown"),
+                predicted_roi=0.5,
+                actual_roi=0.7 if d.get("success", False) else 0.1,
+                context={"agent": d.get("agent", "")},
+            )
+        save_roi_data(data)
+        state["roi_data"] = {
+            "model": data.get("roi_model", {}),
+            "history_count": len(data.get("action_history", [])),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        save_state()
+        logger.info("ROI predictions updated")
+    except Exception as e:
+        logger.error(f"ROI update failed: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_state()
@@ -180,6 +236,9 @@ async def lifespan(app: FastAPI):
         id="health_check",
     )
 
+    # Upgrade module scheduled jobs
+    scheduler.add_job(run_learning_update, "interval", hours=2, id="learning_update")
+    scheduler.add_job(run_roi_update, "interval", hours=4, id="roi_update")
     scheduler.start()
 
     # Run initial health check + cycle on startup
@@ -388,3 +447,33 @@ async def manager_dashboard():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=settings.API_PORT, reload=False)
+
+
+# ── AI-Powered Upgrade Endpoints ─────────────────────────────────────
+
+@app.get("/api/learning")
+async def get_learning_data():
+    """Get cross-agent learning data and effectiveness scores."""
+    from cross_agent_learning import load_learning_data, get_agent_effectiveness_scores, get_recommended_priorities
+    data = load_learning_data()
+    scores = get_agent_effectiveness_scores(data)
+    priorities = get_recommended_priorities(data)
+    return {"agent_scores": scores, "priorities": priorities, "total_outcomes": len(data.get("dispatch_outcomes", []))}
+
+
+@app.get("/api/roi")
+async def get_roi_data():
+    """Get ROI prediction data."""
+    from roi_predictor import load_roi_data
+    data = load_roi_data()
+    return {"roi_model": data.get("roi_model", {}), "history_count": len(data.get("action_history", []))}
+
+
+@app.post("/api/roi/predict")
+async def predict_action_roi(action_type: str, urgency: float = 0.5):
+    """Predict ROI for a proposed action."""
+    from roi_predictor import load_roi_data, predict_roi
+    data = load_roi_data()
+    result = predict_roi(action_type, {"urgency": urgency}, data)
+    return result
+
