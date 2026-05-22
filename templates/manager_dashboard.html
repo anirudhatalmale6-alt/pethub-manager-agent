@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PetHub Smart Manager — Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080a0f;--surface:#0d1018;--card:#111621;--card-hover:#161d2d;
+  --border:#1a2236;--border-light:#243050;
+  --text:#e2e8f0;--text-dim:#7a8ba8;--text-muted:#4a5878;
+  --green:#22c55e;--green-dim:#166534;--green-glow:rgba(34,197,94,.15);
+  --red:#ef4444;--red-dim:#7f1d1d;--red-glow:rgba(239,68,68,.12);
+  --amber:#f59e0b;--amber-dim:#78350f;--amber-glow:rgba(245,158,11,.1);
+  --blue:#3b82f6;--blue-dim:#1e3a5f;--blue-glow:rgba(59,130,246,.1);
+  --purple:#8b5cf6;--purple-dim:#3b1f7a;--purple-glow:rgba(139,92,246,.12);
+  --cyan:#06b6d4;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Outfit',sans-serif;
+  min-height:100vh;overflow-x:hidden;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(139,92,246,.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(59,130,246,.04) 0%, transparent 50%);
+}
+
+/* Scanline overlay */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+.shell{max-width:1440px;margin:0 auto;padding:1.5rem 2rem 3rem}
+
+/* ─── HEADER ─── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 0 1.5rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.75rem;position:relative;
+}
+.header::after{
+  content:'';position:absolute;bottom:-1px;left:0;width:120px;height:1px;
+  background:linear-gradient(90deg,var(--purple),transparent);
+}
+.header-left{display:flex;align-items:center;gap:1rem}
+.brain-icon{
+  width:42px;height:42px;border-radius:12px;
+  background:linear-gradient(135deg,var(--purple),#6d28d9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;position:relative;
+  box-shadow:0 0 20px rgba(139,92,246,.25);
+}
+.brain-icon::before{
+  content:'';position:absolute;inset:-3px;border-radius:14px;
+  border:1px solid rgba(139,92,246,.3);
+  animation:iconPulse 3s ease-in-out infinite;
+}
+@keyframes iconPulse{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+.header-title{font-size:1.6rem;font-weight:700;letter-spacing:-.02em}
+.header-title span{color:var(--purple);font-weight:800}
+.header-sub{font-size:.75rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:2px;letter-spacing:.04em}
+.header-right{display:flex;gap:1.5rem;align-items:center}
+.header-stat{text-align:right}
+.header-stat-value{
+  font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;
+  color:var(--text);letter-spacing:-.01em;
+}
+.header-stat-label{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
+.status-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  display:inline-block;margin-right:6px;
+  box-shadow:0 0 8px var(--green);
+  animation:dotBlink 2s ease-in-out infinite;
+}
+.status-dot.offline{background:var(--red);box-shadow:0 0 8px var(--red)}
+@keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ─── SECTION TITLES ─── */
+.section-title{
+  font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--text-muted);font-weight:600;margin-bottom:.75rem;
+  display:flex;align-items:center;gap:.5rem;
+}
+.section-title::before{
+  content:'';width:3px;height:12px;border-radius:2px;
+  background:var(--purple);
+}
+
+/* ─── AGENT HEALTH GRID ─── */
+.agents-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.75rem}
+.agent-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.1rem;position:relative;overflow:hidden;
+  transition:all .25s ease;cursor:default;
+}
+.agent-card:hover{border-color:var(--border-light);background:var(--card-hover)}
+.agent-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--green);opacity:.8;transition:background .3s;
+}
+.agent-card.unhealthy::before{background:var(--red)}
+.agent-card.unhealthy{border-color:var(--red-dim)}
+.agent-name{font-size:.95rem;font-weight:600;margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem}
+.agent-name .tag{
+  font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;
+  padding:2px 6px;border-radius:4px;font-weight:600;
+  font-family:'JetBrains Mono',monospace;
+}
+.tag-seo{background:var(--blue-glow);color:var(--blue)}
+.tag-analytics{background:var(--purple-glow);color:var(--purple)}
+.tag-social{background:var(--amber-glow);color:var(--amber)}
+.tag-maintenance{background:var(--green-glow);color:var(--green)}
+.agent-status{display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-family:'JetBrains Mono',monospace}
+.agent-status .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.agent-status .dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.agent-status .dot.fail{background:var(--red);box-shadow:0 0 6px var(--red)}
+.agent-meta{font-size:.68rem;color:var(--text-muted);margin-top:.35rem;font-family:'JetBrains Mono',monospace}
+
+/* ─── MAIN GRID ─── */
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.75rem}
+
+/* ─── EVENT FEED ─── */
+.feed-panel{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:1rem;max-height:340px;display:flex;flex-direction:column;
+}
+.feed-scroll{overflow-y:auto;flex:1;padding-right:.25rem}
+.event-row{
+  display:grid;grid-template-columns:7px 1fr auto;gap:.6rem;
+  align-items:start;padding:.5rem 0;
+  border-bottom:1px solid rgba(26,34,54,.6);
+}
+.event-row:last-child{border-bottom:none}
+.ev-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ev-dot.critical{background:var(--red);box-shadow:0 0 6px var(--red)}
+.ev-dot.warning{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.ev-dot.info{background:var(--blue);box-shadow:0 0 4px var(--blue)}
+.ev-type{font-size:.7rem;font-family:'JetBrains Mono',monospace;color:var(--text-dim);font-weight:500}
+.ev-detail{font-size:.76rem;color:var(--text);margin-top:1px;line-height:1.35}
+.ev-source{
+  font-size:.58rem;font-family:'JetBrains Mono',monospace;
+  color:var(--text-muted);background:rgba(255,255,255,.03);
+  padding:1px 5px;border-radius:3px;margin-top:3px;display:inline-block;
+}
+.ev-time{font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted);white-space:nowrap;margin-top:3px}
+
+/* ─── DISPATCH LOG ─── */
+.dispatch-row{
+  display:grid;grid-template-columns:1fr auto auto auto;gap:.75rem;
+  align-items:center;padding:.45rem 0;
+  border-bottom:1px solid rgba(26,34,54,.6);font-size:.76rem;
+}
+.dispatch-row:last-child{border-bottom:none}
+.d-action{font-weight:500;color:var(--text)}
+.d-agent{
+  font-size:.6rem;font-family:'JetBrains Mono',monospace;
+  padding:2px 6px;border-radius:4px;text-transform:uppercase;
+  letter-spacing:.04em;font-weight:600;
+}
+.d-agent.seo{background:var(--blue-glow);color:var(--blue)}
+.d-agent.social{background:var(--amber-glow);color:var(--amber)}
+.d-agent.maintenance{background:var(--green-glow);color:var(--green)}
+.d-agent.analytics{background:var(--purple-glow);color:var(--purple)}
+.d-status{font-size:.65rem;font-family:'JetBrains Mono',monospace}
+.d-status.ok{color:var(--green)}
+.d-status.fail{color:var(--red)}
+.d-time{font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted)}
+
+/* ─── QUICK ACTIONS ─── */
+.actions-section{margin-bottom:1.75rem}
+.actions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+.action-btn{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:.7rem .8rem;color:var(--text);cursor:pointer;
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  display:flex;align-items:center;gap:.5rem;
+  transition:all .2s ease;position:relative;overflow:hidden;
+}
+.action-btn:hover{background:var(--card-hover);border-color:var(--border-light);transform:translateY(-1px)}
+.action-btn:active{transform:translateY(0)}
+.action-btn.loading{opacity:.5;pointer-events:none}
+.action-btn .icon{font-size:1rem;width:20px;text-align:center}
+.action-btn.purple:hover{border-color:rgba(139,92,246,.4);box-shadow:0 0 12px rgba(139,92,246,.1)}
+.action-btn.blue:hover{border-color:rgba(59,130,246,.4);box-shadow:0 0 12px rgba(59,130,246,.1)}
+.action-btn.amber:hover{border-color:rgba(245,158,11,.4);box-shadow:0 0 12px rgba(245,158,11,.1)}
+.action-btn.green:hover{border-color:rgba(34,197,94,.4);box-shadow:0 0 12px rgba(34,197,94,.1)}
+.action-btn.red:hover{border-color:rgba(239,68,68,.3);box-shadow:0 0 12px rgba(239,68,68,.08)}
+
+/* ─── SNAPSHOTS ─── */
+.snapshots-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.75rem}
+.snap-panel{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.1rem;
+}
+.snap-title{font-size:.85rem;font-weight:600;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+.snap-title .dot{width:8px;height:8px;border-radius:50%}
+.snap-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.3rem 0;font-size:.78rem;
+}
+.snap-label{color:var(--text-muted)}
+.snap-value{font-family:'JetBrains Mono',monospace;font-weight:500}
+.snap-value.good{color:var(--green)}
+.snap-value.warn{color:var(--amber)}
+.snap-value.bad{color:var(--red)}
+.snap-value.neutral{color:var(--text)}
+.snap-divider{height:1px;background:var(--border);margin:.4rem 0}
+
+/* ─── CYCLES ─── */
+.cycles-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem}
+.cycle-card{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:.65rem .75rem;font-size:.72rem;
+}
+.cycle-num{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--purple);font-size:.7rem}
+.cycle-stat{display:flex;justify-content:space-between;margin-top:.25rem;color:var(--text-muted)}
+.cycle-stat span:last-child{font-family:'JetBrains Mono',monospace;color:var(--text)}
+
+/* ─── EMPTY STATE ─── */
+.empty{
+  text-align:center;padding:2rem;color:var(--text-muted);
+  font-size:.8rem;font-style:italic;
+}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;
+  background:var(--card);border:1px solid var(--border-light);
+  border-radius:8px;padding:.65rem 1rem;
+  font-size:.78rem;color:var(--text);
+  box-shadow:0 8px 30px rgba(0,0,0,.4);
+  transform:translateY(80px);opacity:0;
+  transition:all .3s cubic-bezier(.4,0,.2,1);z-index:1000;
+  display:flex;align-items:center;gap:.5rem;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error{border-left:3px solid var(--red)}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:1024px){
+  .agents-grid{grid-template-columns:repeat(2,1fr)}
+  .main-grid{grid-template-columns:1fr}
+  .snapshots-grid{grid-template-columns:1fr}
+  .actions-grid{grid-template-columns:repeat(2,1fr)}
+  .cycles-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:640px){
+  .shell{padding:1rem}
+  .agents-grid{grid-template-columns:1fr}
+  .actions-grid{grid-template-columns:1fr}
+  .cycles-grid{grid-template-columns:repeat(2,1fr)}
+  .header{flex-direction:column;gap:1rem;align-items:flex-start}
+}
+
+/* ─── LOAD ANIMATION ─── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeUp .5s ease both}
+.delay-1{animation-delay:.1s}.delay-2{animation-delay:.2s}.delay-3{animation-delay:.3s}
+.delay-4{animation-delay:.4s}.delay-5{animation-delay:.5s}.delay-6{animation-delay:.6s}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <header class="header fade-in">
+    <div class="header-left">
+      <div class="brain-icon">&#x1F9E0;</div>
+      <div>
+        <div class="header-title">PetHub <span>Smart Manager</span></div>
+        <div class="header-sub"><span class="status-dot" id="globalDot"></span>COMMAND CENTER &mdash; MONITORING ACTIVE</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <div class="header-stat-value" id="uptimeVal">--:--:--</div>
+        <div class="header-stat-label">Uptime</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-value" id="cycleVal">0</div>
+        <div class="header-stat-label">Cycles</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-value" id="eventVal">0</div>
+        <div class="header-stat-label">Events</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-value" id="dispatchVal">0</div>
+        <div class="header-stat-label">Dispatches</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- AGENT HEALTH -->
+  <div class="section-title fade-in delay-1">Agent Health</div>
+  <div class="agents-grid fade-in delay-1" id="agentsGrid">
+    <div class="agent-card"><div class="empty">Loading&hellip;</div></div>
+    <div class="agent-card"><div class="empty">Loading&hellip;</div></div>
+    <div class="agent-card"><div class="empty">Loading&hellip;</div></div>
+    <div class="agent-card"><div class="empty">Loading&hellip;</div></div>
+  </div>
+
+  <!-- EVENTS + DISPATCHES -->
+  <div class="main-grid fade-in delay-2">
+    <div class="feed-panel">
+      <div class="section-title" style="margin-bottom:.6rem">Live Event Feed</div>
+      <div class="feed-scroll" id="eventFeed"><div class="empty">No events yet</div></div>
+    </div>
+    <div class="feed-panel">
+      <div class="section-title" style="margin-bottom:.6rem">Dispatch Log</div>
+      <div class="feed-scroll" id="dispatchLog"><div class="empty">No dispatches yet</div></div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="actions-section fade-in delay-3">
+    <div class="section-title">Quick Actions</div>
+    <div class="actions-grid">
+      <button class="action-btn blue" onclick="dispatch('/api/dispatch/seo/audit',this)"><span class="icon">&#x1F50D;</span>SEO Audit</button>
+      <button class="action-btn amber" onclick="dispatch('/api/dispatch/social/post',this)"><span class="icon">&#x1F4E3;</span>Social Post</button>
+      <button class="action-btn amber" onclick="dispatch('/api/dispatch/social/reel',this)"><span class="icon">&#x1F3AC;</span>Generate Reel</button>
+      <button class="action-btn green" onclick="dispatch('/api/dispatch/maintenance/links',this)"><span class="icon">&#x1F517;</span>Link Scan</button>
+      <button class="action-btn green" onclick="dispatch('/api/dispatch/maintenance/performance',this)"><span class="icon">&#x26A1;</span>Perf Scan</button>
+      <button class="action-btn green" onclick="dispatch('/api/dispatch/maintenance/security',this)"><span class="icon">&#x1F6E1;</span>Security Scan</button>
+      <button class="action-btn purple" onclick="dispatch('/api/cycle/run',this)"><span class="icon">&#x1F504;</span>Full Cycle</button>
+      <button class="action-btn red" onclick="dispatch('/api/cooldowns/reset',this)"><span class="icon">&#x23F1;</span>Reset Cooldowns</button>
+    </div>
+  </div>
+
+  <!-- MONITORING SNAPSHOTS -->
+  <div class="fade-in delay-4">
+    <div class="section-title">Monitoring Snapshots</div>
+    <div class="snapshots-grid">
+      <div class="snap-panel" id="wpSnap">
+        <div class="snap-title"><div class="dot" style="background:var(--blue)"></div>WordPress</div>
+        <div class="empty">Awaiting first cycle&hellip;</div>
+      </div>
+      <div class="snap-panel" id="socialSnap">
+        <div class="snap-title"><div class="dot" style="background:var(--amber)"></div>Social Media</div>
+        <div class="empty">Awaiting first cycle&hellip;</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CYCLE HISTORY -->
+  <div class="fade-in delay-5">
+    <div class="section-title">Recent Cycles</div>
+    <div class="cycles-grid" id="cyclesGrid"><div class="empty" style="grid-column:1/-1">No cycles yet</div></div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const API = '';
+
+function showToast(msg, type='success') {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function timeAgo(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+async function fetchJSON(path) {
+  try {
+    const r = await fetch(API + path);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function dispatch(path, btn) {
+  btn.classList.add('loading');
+  try {
+    const r = await fetch(API + path, {method:'POST'});
+    const d = await r.json().catch(()=>({}));
+    if (r.ok) {
+      showToast('Dispatched: ' + (d.message || d.action || 'OK'), 'success');
+    } else {
+      showToast('Failed: ' + (d.detail || r.status), 'error');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  btn.classList.remove('loading');
+  setTimeout(refreshAll, 1500);
+}
+
+function renderAgents(data) {
+  if (!data) return;
+  const grid = $('#agentsGrid');
+  const agents = ['seo','analytics','social','maintenance'];
+  const labels = {seo:'SEO',analytics:'Analytics',social:'Social',maintenance:'Maintenance'};
+  const tags = {seo:'tag-seo',analytics:'tag-analytics',social:'tag-social',maintenance:'tag-maintenance'};
+
+  grid.innerHTML = agents.map(a => {
+    const h = data[a] || {};
+    const ok = h.healthy;
+    const st = h.status || (ok ? 'active' : 'down');
+    const checked = h.checked_at;
+    return `<div class="agent-card ${ok ? '' : 'unhealthy'}">
+      <div class="agent-name">${labels[a]} <span class="tag ${tags[a]}">${a.toUpperCase()}</span></div>
+      <div class="agent-status"><span class="dot ${ok?'ok':'fail'}"></span>${ok?'Healthy':'Unhealthy'} &mdash; ${st}</div>
+      <div class="agent-meta">${checked ? timeAgo(checked) : 'not checked'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderEvents(data) {
+  if (!data || !data.events) return;
+  const el = $('#eventFeed');
+  if (!data.events.length) { el.innerHTML = '<div class="empty">No events yet</div>'; return; }
+  el.innerHTML = data.events.slice(0, 30).map(e => {
+    const sev = e.severity || 'info';
+    return `<div class="event-row">
+      <div class="ev-dot ${sev}"></div>
+      <div>
+        <div class="ev-type">${e.type || ''}</div>
+        <div class="ev-detail">${e.detail || ''}</div>
+        <div class="ev-source">${e.source || ''}</div>
+      </div>
+      <div class="ev-time">${timeAgo(e.time)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDispatches(data) {
+  if (!data || !data.dispatches) return;
+  const el = $('#dispatchLog');
+  if (!data.dispatches.length) { el.innerHTML = '<div class="empty">No dispatches yet</div>'; return; }
+  el.innerHTML = data.dispatches.slice(0, 30).map(d => {
+    const ok = d.success;
+    const agent = d.agent || '';
+    return `<div class="dispatch-row">
+      <div class="d-action">${d.action || ''}</div>
+      <div class="d-agent ${agent}">${agent}</div>
+      <div class="d-status ${ok?'ok':'fail'}">${ok?'OK':'FAIL'}</div>
+      <div class="d-time">${timeAgo(d.time)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderWpSnap(data) {
+  const el = $('#wpSnap');
+  if (!data || Object.keys(data).length === 0) return;
+  const h = data.health || {};
+  const c = data.content_check || {};
+  const reachClass = h.reachable ? 'good' : 'bad';
+  const ttfb = h.ttfb_ms || 0;
+  const ttfbClass = ttfb < 1000 ? 'good' : ttfb < 2000 ? 'warn' : 'bad';
+
+  el.innerHTML = `
+    <div class="snap-title"><div class="dot" style="background:var(--blue)"></div>WordPress</div>
+    <div class="snap-row"><span class="snap-label">Site Status</span><span class="snap-value ${reachClass}">${h.reachable ? 'Reachable' : 'DOWN'}</span></div>
+    <div class="snap-row"><span class="snap-label">TTFB</span><span class="snap-value ${ttfbClass}">${ttfb}ms</span></div>
+    <div class="snap-row"><span class="snap-label">API</span><span class="snap-value ${h.api_reachable?'good':'bad'}">${h.api_reachable ? 'OK' : 'Down'}</span></div>
+    <div class="snap-divider"></div>
+    <div class="snap-row"><span class="snap-label">New Content</span><span class="snap-value neutral">${c.total_new || 0}</span></div>
+    <div class="snap-row"><span class="snap-label">Modified</span><span class="snap-value neutral">${c.total_modified || 0}</span></div>
+    <div class="snap-row"><span class="snap-label">Checked</span><span class="snap-value neutral">${timeAgo(data.checked_at)}</span></div>
+  `;
+}
+
+function renderSocialSnap(data) {
+  const el = $('#socialSnap');
+  if (!data || Object.keys(data).length === 0) return;
+  const trend = data.trend || {};
+  const trendText = trend.trend || 'unknown';
+  const trendClass = trendText === 'spiking' ? 'good' : trendText === 'dropping' ? 'bad' : 'neutral';
+  const changePct = trend.change_pct || 0;
+
+  el.innerHTML = `
+    <div class="snap-title"><div class="dot" style="background:var(--amber)"></div>Social Media</div>
+    <div class="snap-row"><span class="snap-label">Engagement Trend</span><span class="snap-value ${trendClass}">${trendText} ${changePct ? '(' + (changePct > 0 ? '+' : '') + changePct + '%)' : ''}</span></div>
+    <div class="snap-row"><span class="snap-label">Avg Engagement</span><span class="snap-value neutral">${data.avg_engagement || 0}</span></div>
+    <div class="snap-row"><span class="snap-label">Followers</span><span class="snap-value neutral">${(data.followers || 0).toLocaleString()}</span></div>
+    <div class="snap-divider"></div>
+    <div class="snap-row"><span class="snap-label">Recent Posts</span><span class="snap-value neutral">${(data.last_posts || []).length}</span></div>
+    <div class="snap-row"><span class="snap-label">Checked</span><span class="snap-value neutral">${timeAgo(data.checked_at)}</span></div>
+  `;
+}
+
+function renderCycles(data) {
+  if (!data || !data.cycles) return;
+  const el = $('#cyclesGrid');
+  if (!data.cycles.length) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">No cycles yet</div>'; return; }
+  el.innerHTML = data.cycles.slice(0, 10).map(c => {
+    const r = c.results || {};
+    const allOk = Object.values(r).every(v => v === 'ok' || (typeof v === 'object'));
+    return `<div class="cycle-card">
+      <div class="cycle-num">#${c.cycle}</div>
+      <div class="cycle-stat"><span>Events</span><span>${c.events || 0}</span></div>
+      <div class="cycle-stat"><span>Dispatches</span><span>${c.dispatches || 0}</span></div>
+      <div class="cycle-stat"><span>Status</span><span style="color:${allOk?'var(--green)':'var(--amber)'}">&#x25CF;</span></div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshAll() {
+  const [status, agents, events, dispatches, wpSnap, socialSnap, cycles] = await Promise.all([
+    fetchJSON('/api/status'),
+    fetchJSON('/api/agents'),
+    fetchJSON('/api/events?limit=30'),
+    fetchJSON('/api/dispatches?limit=30'),
+    fetchJSON('/api/snapshot/wordpress'),
+    fetchJSON('/api/snapshot/social'),
+    fetchJSON('/api/cycles?limit=10'),
+  ]);
+
+  if (status) {
+    $('#uptimeVal').textContent = status.uptime || '--';
+    $('#cycleVal').textContent = status.total_cycles || 0;
+    $('#eventVal').textContent = status.total_events || 0;
+    $('#dispatchVal').textContent = status.total_dispatches || 0;
+    $('#globalDot').className = 'status-dot' + (status.status === 'active' ? '' : ' offline');
+  }
+
+  renderAgents(agents);
+  renderEvents(events);
+  renderDispatches(dispatches);
+  renderWpSnap(wpSnap);
+  renderSocialSnap(socialSnap);
+  renderCycles(cycles);
+}
+
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
