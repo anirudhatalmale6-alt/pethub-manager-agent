@@ -335,6 +335,8 @@ body::after{
       <button class="action-btn green" onclick="dispatch('/api/dispatch/maintenance/security',this)"><span class="icon">&#x1F6E1;</span>Security Scan</button>
       <button class="action-btn purple" onclick="dispatch('/api/cycle/run',this)"><span class="icon">&#x1F504;</span>Full Cycle</button>
       <button class="action-btn red" onclick="dispatch('/api/cooldowns/reset',this)"><span class="icon">&#x23F1;</span>Reset Cooldowns</button>
+      <button class="action-btn" style="background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.3);color:#a78bfa" onclick="togglePanel('learningdata');loadLearningData()"><span class="icon">&#x1F9E0;</span>Learning</button>
+      <button class="action-btn" style="background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.3);color:#a78bfa" onclick="togglePanel('roipredict');loadROIPredict()"><span class="icon">&#x1F4B0;</span>ROI Predictor</button>
     </div>
   </div>
 
@@ -365,8 +367,8 @@ body::after{
 <div class="toast" id="toast"></div>
 
 
-  <div id="learningdata" class="tab-panel" style="display:none"><div class="section"><h2>Loading Learning Data...</h2></div></div>
-  <div id="roipredict" class="tab-panel" style="display:none"><div class="section"><h2>Loading ROI Predictor...</h2></div></div>
+  <div id="learningdata" class="feed-panel" style="display:none;margin-top:16px"><div class="section"><h2>Loading Learning Data...</h2></div></div>
+  <div id="roipredict" class="feed-panel" style="display:none;margin-top:16px"><div class="section"><h2>Loading ROI Predictor...</h2></div></div>
 <script>
 const $ = s => document.querySelector(s);
 const API = '/agents/manager';
@@ -554,7 +556,15 @@ refreshAll();
 setInterval(refreshAll, 30000);
 
 
-// ── Learning Data Tab ──
+// ── Toggle Panel Helper ──
+function togglePanel(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// ── Toggle Panel Helper ──
 async function loadLearningData() {
   const r = await fetch('/agents/manager/api/learning');
   const d = await r.json();
